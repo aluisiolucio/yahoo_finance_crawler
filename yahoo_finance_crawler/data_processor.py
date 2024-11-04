@@ -1,7 +1,9 @@
+import platform
 import time
 
 import requests
 from bs4 import BeautifulSoup
+from requests.exceptions import ConnectionError, Timeout
 
 
 class DataProcessor:
@@ -9,14 +11,39 @@ class DataProcessor:
         pass
 
     @staticmethod
-    def _scrape_page(url):
-        headers = {
-            'User-Agent': (
+    def _fetch_url(url, headers=None, retries=3):
+        for i in range(retries):
+            try:
+                response = requests.get(url, headers=headers, timeout=15)
+                response.raise_for_status()
+
+                return response
+            except (ConnectionError, Timeout) as e:
+                print(f"Tentativa {i + 1} falhou: {e}")
+                time.sleep(3)
+
+        return None
+
+    def _scrape_page(self, url):
+        user_gent = ""
+        if platform.system() == "Windows":
+            user_gent = (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
+            )
+        elif platform.system() == "Linux":
+            user_gent = (
                 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
                 '(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
             )
-        }
-        response = requests.get(url, headers=headers)
+
+        headers = {'User-Agent': user_gent}
+        response = self._fetch_url(url, headers=headers)
+
+        if not response:
+            print(f"Não foi possível acessar a URL {url} em 3 tentativas")
+            return []
+
         soup = BeautifulSoup(response.text, 'html.parser')
 
         table = soup.find('table', class_='W(100%)')
@@ -56,7 +83,7 @@ class DataProcessor:
                 break
 
             all_data.extend(data)
-            time.sleep(2)
+            time.sleep(3)
 
             page += 100
 

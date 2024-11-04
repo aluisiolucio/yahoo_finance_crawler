@@ -1,31 +1,19 @@
-import argparse
-
 from csv_exporter import CSVExporter
 from data_processor import DataProcessor
 from selenium_scraper import SeleniumScraper
 
-parser = argparse.ArgumentParser(description='Descrição do seu script.')
-parser.add_argument(
-    'region',
-    type=str,
-    help='O nome da região para ser usado como filtro de busca.'
-)
-args = parser.parse_args()
 
-if __name__ == '__main__':
-    try:
-        region = args.region.lower()
+class YahooFinanceCrawler:
+    def __init__(self, region: str):
+        self._region = region
+        self._data = None
+        self._scraper = SeleniumScraper(region)
+        self._data_processor = DataProcessor()
 
-        sc = SeleniumScraper(region)
-        sc.fetch_html()
+    def run(self):
+        self._scraper.fetch_html()
+        self._data = self._data_processor.scrape_all_pages(
+            self._scraper.current_url, end_page=self._scraper.count
+        )
 
-        bs = DataProcessor()
-        data = bs.scrape_all_pages(sc.current_url, end_page=sc.cout)
-
-        CSVExporter.export_to_csv(data, 'yahoo_finance_data.csv')
-    except KeyboardInterrupt:
-        print('\nPrograma interrompido pelo usuário')
-    except FileNotFoundError:
-        print('Arquivo não encontrado')
-    except Exception as e:
-        print(e)
+        CSVExporter.export_to_csv(self._data, 'yahoo_finance_data.csv')
