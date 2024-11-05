@@ -5,8 +5,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from utils import extract_numbers
 from webdriver_manager.chrome import ChromeDriverManager
+
+from yahoo_finance_crawler.utils import extract_numbers
 
 SELECTED_REGION_BUTTON = (
     '//*[@id="screener-criteria"]/div[2]/div[1]/div[1]/div[1]/div/div[2]/ul/li[1]/button'
@@ -43,13 +44,19 @@ class SeleniumScraper:
     def count(self) -> int:
         return self._count
 
+    @property
+    def driver(self) -> webdriver.Chrome:
+        return self._driver
+
     @staticmethod
     def _initialize_driver() -> webdriver.Chrome:
         service = Service(ChromeDriverManager().install())
 
         chrome_options = Options()
-        chrome_options.add_argument('profile.managed_default_content_settings.images=2')
-        # chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument(
+            'profile.managed_default_content_settings.images=2'
+        )
+        chrome_options.add_argument("--headless=new")
 
         return webdriver.Chrome(service=service, options=chrome_options)
 
@@ -72,12 +79,6 @@ class SeleniumScraper:
         )
         input_element.send_keys(text)
 
-    def _reload_required(self) -> bool:
-        return any(
-            self._driver.find_elements(By.XPATH, span)
-            for span in [RELOAD_MESSAGE_FILTER_SPAN, RELOAD_MESSAGE_DATA_SPAN]
-        )
-
     def _set_region_filter(self):
         self._click_element(SELECTED_REGION_BUTTON)
         self._click_element(REGION_SELECT_BUTTON)
@@ -92,23 +93,33 @@ class SeleniumScraper:
         region_checkbox.click()
 
     def fetch_html(self):
-        try:
-            self._load_page()
-            self._set_region_filter()
-            self._click_element(FIND_STOCKS_BUTTON)
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                self._load_page()
+                self._set_region_filter()
+                self._click_element(FIND_STOCKS_BUTTON)
 
-            if self._reload_required():
-                self.fetch_html()
-                return
+                WebDriverWait(self._driver, 20).until(
+                    EC.presence_of_element_located((By.XPATH, TABLE_OF_STOCKS))
+                )
 
-            WebDriverWait(self._driver, 20).until(
-                EC.presence_of_element_located((By.XPATH, TABLE_OF_STOCKS))
-            )
+                results_text = (
+                    WebDriverWait(self._driver, 10)
+                    .until(
+                        EC.presence_of_element_located((
+                            By.XPATH,
+                            RESULTS_SPAN,
+                        ))
+                    )
+                    .text
+                )
 
-            results_text = self._driver.find_element(
-                By.XPATH, RESULTS_SPAN
-            ).text
-            self._count = extract_numbers(results_text)[2]
-            self._current_url = self._driver.current_url
-        finally:
-            self._driver.quit()
+                self._count = extract_numbers(results_text)[2]
+                self._current_url = self._driver.current_url
+
+                break
+            except TimeoutException as e:
+                print(f'Timeout na tentativa {attempt + 1}: {e}')
+            except Exception as e:
+                print(f'Erro ao buscar dados: {e}')

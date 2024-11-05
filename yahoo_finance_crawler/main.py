@@ -1,12 +1,12 @@
 import argparse
 
-from crawler import YahooFinanceCrawler
+from yahoo_finance_crawler.crawler import YahooFinanceCrawler
 
 parser = argparse.ArgumentParser(description='Descrição do seu script.')
 parser.add_argument(
     'region',
     type=str,
-    help='O nome da região para ser usado como filtro de busca.'
+    help='O nome da região para ser usado como filtro de busca.',
 )
 args = parser.parse_args()
 

@@ -8,3 +8,5 @@ class CSVExporter:
             writer = csv.DictWriter(f, fieldnames=data[0].keys())
             writer.writeheader()
             writer.writerows(data)
+
+        print(f'\nDados exportados para {filename} com sucesso!')
